@@ -1,0 +1,211 @@
+From bc75effd8b488ad4652e9a2ccf0e27cbbfa32c5c Mon Sep 17 00:00:00 2001
+From: offreitas <offreitas@outlook.com>
+Date: Tue, 5 Dec 2023 21:31:31 -0300
+Subject: [PATCH 5/5] LibSPDM ready for U-Boot
+
+---
+ CMakeLists.txt                              | 45 +++++++++++++++++----
+ include/library/spdm_lib_config.h           |  2 +-
+ os_stub/mbedtlslib/include/mbedtls/config.h | 20 ++++-----
+ 3 files changed, 48 insertions(+), 19 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 537a3193f8..f6414f3988 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -45,6 +45,10 @@ endif()
+ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+     if(TOOLCHAIN STREQUAL "GCC")
+         MESSAGE("TOOLCHAIN = GCC")
++    elseif(TOOLCHAIN STREQUAL "EDK2")
++        MESSAGE("TOOLCHAIN = EDK2")
++    elseif(TOOLCHAIN STREQUAL "UBOOT")
++        MESSAGE("TOOLCHAIN = UBOOT")
+     elseif(TOOLCHAIN STREQUAL "BUILDROOT")
+         MESSAGE("TOOLCHAIN = BUILDROOT")
+     elseif(TOOLCHAIN STREQUAL "BUILDROOT_USERSPACE")
+@@ -136,8 +140,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+ 
+     if(TOOLCHAIN STREQUAL "GCC")
+         SET(CMAKE_C_COMPILER gcc)
+-        SET(CMAKE_C_FLAGS "-g -fshort-wchar -fno-strict-aliasing -Wall -Werror -Wno-array-bounds -ffunction-sections -fdata-sections -fno-common -maccumulate-outgoing-args -mno-red-zone -Wno-address -fpie -fno-asynchronous-unwind-tables -flto -DUSING_LTO -Wno-switch -Wno-maybe-uninitialized -Wno-uninitialized  -Wno-builtin-declaration-mismatch -Wno-nonnull-compare --coverage -fprofile-arcs -ftest-coverage")
+-        SET(MBEDTLS_FLAGS "")
++        SET(CMAKE_C_FLAGS "-g -fshort-wchar -fno-strict-aliasing -Wall -Werror -Wno-array-bounds -Wno-unused-but-set-variable -ffunction-sections -fdata-sections -fno-common -maccumulate-outgoing-args -mno-red-zone -Wno-address -fpie -fno-asynchronous-unwind-tables -flto=1 -DUSING_LTO -Wno-switch -Wno-maybe-uninitialized -Wno-uninitialized  -Wno-builtin-declaration-mismatch -Wno-nonnull-compare --coverage -fprofile-arcs -ftest-coverage")
++        SET(MBEDTLS_FLAGS "-Warray-parameter=0 -Wno-stringop-overflow")
+         SET(OPENSSL_FLAGS "-include base.h -Wno-error=maybe-uninitialized -Wno-error=format -Wno-format -Wno-error=unused-but-set-variable")
+         SET(CMOCKA_FLAGS "-std=gnu99 -Wpedantic -Wall -Wshadow -Wmissing-prototypes -Wcast-align -Werror=address -Wstrict-prototypes -Werror=strict-prototypes -Wwrite-strings -Werror=write-strings -Werror-implicit-function-declaration -Wpointer-arith -Werror=pointer-arith -Wdeclaration-after-statement -Werror=declaration-after-statement -Wreturn-type -Werror=return-type -Wuninitialized -Werror=uninitialized -Werror=strict-overflow -Wstrict-overflow=2 -Wno-format-zero-length -Wmissing-field-initializers -Wformat-security -Werror=format-security -fno-common -Wformat -fno-common -fstack-protector-strong")
+ 
+@@ -148,17 +152,41 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+         endif()
+ 
+         SET(CMAKE_LINKER gcc)
+-        SET(CMAKE_EXE_LINKER_FLAGS "-flto -Wno-error -no-pie --coverage -lgcov -fprofile-arcs -ftest-coverage" )
++        SET(CMAKE_EXE_LINKER_FLAGS "-flto=1 -Wno-error -no-pie --coverage -lgcov -fprofile-arcs -ftest-coverage" )
++
++        SET(CMAKE_C_LINK_EXECUTABLE "<CMAKE_LINKER> <LINK_FLAGS> <OBJECTS> -o <TARGET> -Wl,--start-group <LINK_LIBRARIES> -Wl,--end-group")
++
++    elseif(TOOLCHAIN STREQUAL "EDK2")
++        SET(CMAKE_C_COMPILER gcc)
++        SET(DISABLE_TESTS "1")
++        SET(CMAKE_C_FLAGS "-g -Os -fshort-wchar -fno-builtin -fno-strict-aliasing -Wall -Werror -Wno-switch -Wno-unused-but-set-variable -Wno-array-bounds -fno-common -ffunction-sections -fdata-sections -DSTRING_ARRAY_NAME=VirtioBlkDxeStrings -m64 -fno-stack-protector \"-DEFIAPI=__attribute__((ms_abi))\" -maccumulate-outgoing-args -mno-red-zone -Wno-address -mcmodel=small -fpie -fno-asynchronous-unwind-tables -Wno-address -fno-omit-frame-pointer -flto -DUSING_LTO -mno-mmx -mno-sse -D DISABLE_NEW_DEPRECATED_INTERFACES -D TDX_GUEST_SUPPORTED -D ENABLE_MD5_DEPRECATED_INTERFACES")
++        SET(MBEDTLS_FLAGS "-Warray-parameter=0 -Wno-stringop-overflow")
++
++        SET(CMAKE_AR gcc-ar)
++
++        SET(CMAKE_LINKER gcc)
++        SET(CMAKE_EXE_LINKER_FLAGS " -Wno-error -flto -no-pie " )
++
++        SET(CMAKE_C_LINK_EXECUTABLE "<CMAKE_LINKER> <LINK_FLAGS> <OBJECTS> -o <TARGET> -Wl,--start-group <LINK_LIBRARIES> -Wl,--end-group")
++
++    elseif(TOOLCHAIN STREQUAL "UBOOT")
++        SET(CMAKE_C_COMPILER riscv64-linux-gcc)
++        SET(DISABLE_TESTS "1")
++        SET(CMAKE_C_FLAGS "-D__KERNEL__ -D__UBOOT__ -Wall -Wstrict-prototypes -Wno-format-security -fno-builtin -ffreestanding -std=gnu11 -fshort-wchar -fno-strict-aliasing -fno-PIE -Os -fno-stack-protector -fno-delete-null-pointer-checks -Wno-pointer-sign -Wno-stringop-truncation -Wno-zero-length-bounds -Wno-array-bounds -Wno-stringop-overflow -Wno-maybe-uninitialized -fmacro-prefix-map=./= -gdwarf-4 -fstack-usage -Wno-format-nonliteral -Wno-address-of-packed-member -Wno-unused-but-set-variable -Werror=date-time -Wno-packed-not-aligned -ffixed-gp -fpic -fno-common -ffunction-sections -fdata-sections -pipe -march=rv64imafdc_zicsr_zifencei -mabi=lp64d -mcmodel=medlow")
++        SET(MBEDTLS_FLAGS "-Warray-parameter=0 -Wno-stringop-overflow")
++
++        SET(CMAKE_AR riscv64-linux-gcc-ar)
++
++        SET(CMAKE_LINKER riscv64-linux--gcc)
++        SET(CMAKE_EXE_LINKER_FLAGS " -Wno-error -flto -no-pie " )
+ 
+         SET(CMAKE_C_LINK_EXECUTABLE "<CMAKE_LINKER> <LINK_FLAGS> <OBJECTS> -o <TARGET> -Wl,--start-group <LINK_LIBRARIES> -Wl,--end-group")
+ 
+     elseif(TOOLCHAIN STREQUAL "BUILDROOT")
+         SET(CMAKE_C_COMPILER x86_64-buildroot-linux-uclibc-gcc)
++        SET(DISABLE_TESTS "1")
+         SET(CMAKE_C_FLAGS "-D__KERNEL__ -Wall  -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -fshort-wchar  -Wno-format-security -std=gnu89 -fno-PIE -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -mno-avx -m64 -falign-jumps=1 -falign-loops=1 -mno-80387 -mno-fp-ret-in-387 -mpreferred-stack-boundary=3 -mskip-rax-setup -mtune=generic -mno-red-zone -mcmodel=kernel -funit-at-a-time -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -DCONFIG_AS_CFI_SECTIONS=1 -DCONFIG_AS_FXSAVEQ=1 -DCONFIG_AS_SSSE3=1 -DCONFIG_AS_CRC32=1 -DCONFIG_AS_AVX=1 -DCONFIG_AS_AVX2=1 -DCONFIG_AS_AVX512=1 -DCONFIG_AS_SHA1_NI=1 -DCONFIG_AS_SHA256_NI=1  -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mindirect-branch=thunk-extern -mindirect-branch-register -fno-jump-tables -fno-delete-null-pointer-checks -O2 --param=allow-store-data-races=0 -Wframe-larger-than=2048 -fno-stack-protector -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-var-tracking-assignments -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fno-merge-all-constants -fmerge-constants -fno-stack-check -fconserve-stack -Werror=implicit-int -Werror=strict-prototypes -Werror=date-time -Werror=incompatible-pointer-types -Werror=designated-init ")
+-        SET(MBEDTLS_FLAGS "")
+-        SET(OPENSSL_FLAGS "-include base.h -Wno-error=maybe-uninitialized -Wno-error=format -Wno-format -Wno-error=unused-but-set-variable")
+-        SET(CMOCKA_FLAGS "-std=gnu99 -Wpedantic -Wall -Wshadow -Wmissing-prototypes -Wcast-align -Werror=address -Wstrict-prototypes -Werror=strict-prototypes -Wwrite-strings -Werror=write-strings -Werror-implicit-function-declaration -Wpointer-arith -Werror=pointer-arith -Wdeclaration-after-statement -Werror=declaration-after-statement -Wreturn-type -Werror=return-type -Wuninitialized -Werror=uninitialized -Werror=strict-overflow -Wstrict-overflow=2 -Wno-format-zero-length -Wmissing-field-initializers -Wformat-security -Werror=format-security -fno-common -Wformat -fno-common -mcmodel=kernel -static -fno-common -fno-exceptions -fno-non-call-exceptions")
+-
++        
+         SET(CMAKE_AR x86_64-buildroot-linux-uclibc-gcc-ar)
+ 
+         SET(CMAKE_LINKER x86_64-buildroot-linux-uclibc-gcc)
+@@ -168,6 +196,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+ 
+     elseif(TOOLCHAIN STREQUAL "BUILDROOT_USERSPACE")
+         SET(CMAKE_C_COMPILER x86_64-buildroot-linux-uclibc-gcc)
++        SET(DISABLE_TESTS "1")
+         SET(CMAKE_C_FLAGS "-g -fshort-wchar -fno-strict-aliasing -Wall         -Wno-array-bounds -ffunction-sections -fdata-sections -fno-common -maccumulate-outgoing-args -mno-red-zone -Wno-address       -fno-asynchronous-unwind-tables                   -Wno-switch -Wno-maybe-uninitialized -Wno-uninitialized                                    -Wno-nonnull-compare ")
+         SET(MBEDTLS_FLAGS "")
+         SET(OPENSSL_FLAGS "-include base.h -Wno-error=maybe-uninitialized -Wno-error=format -Wno-format -Wno-error=unused-but-set-variable")
+@@ -513,7 +542,7 @@ endif()
+     ADD_SUBDIRECTORY(os_stub/malloclib)
+     ADD_SUBDIRECTORY(os_stub/spdm_device_secret_lib)
+     ADD_SUBDIRECTORY(os_stub/spdm_device_secret_lib_null)
+-    if(NOT TOOLCHAIN STREQUAL "BUILDROOT")
++    if(NOT DISABLE_TESTS STREQUAL "1")
+        ADD_SUBDIRECTORY(unit_test/spdm_transport_test_lib)
+        ADD_SUBDIRECTORY(unit_test/cmockalib)
+ 
+diff --git a/include/library/spdm_lib_config.h b/include/library/spdm_lib_config.h
+index 58126c9fdc..13d3fe6e72 100644
+--- a/include/library/spdm_lib_config.h
++++ b/include/library/spdm_lib_config.h
+@@ -18,7 +18,7 @@
+ #define MAX_SPDM_MEASUREMENT_RECORD_SIZE 0x1000
+ #define MAX_SPDM_CERT_CHAIN_BLOCK_LEN 1024
+ 
+-#define MAX_SPDM_MESSAGE_BUFFER_SIZE 0x1200
++#define MAX_SPDM_MESSAGE_BUFFER_SIZE 0x2200
+ #define MAX_SPDM_MESSAGE_SMALL_BUFFER_SIZE 0x100
+ 
+ #define MAX_SPDM_REQUEST_RETRY_TIMES 3
+diff --git a/os_stub/mbedtlslib/include/mbedtls/config.h b/os_stub/mbedtlslib/include/mbedtls/config.h
+index f9fa5f427b..5eed268780 100644
+--- a/os_stub/mbedtlslib/include/mbedtls/config.h
++++ b/os_stub/mbedtlslib/include/mbedtls/config.h
+@@ -68,7 +68,7 @@
+  *
+  * Comment to disable the use of assembly code.
+  */
+-#define MBEDTLS_HAVE_ASM
++// #define MBEDTLS_HAVE_ASM
+ 
+ /**
+  * \def MBEDTLS_NO_UDBL_DIVISION
+@@ -96,7 +96,7 @@
+  * example, if double-width division is implemented in software, disabling
+  * it can reduce code size in some embedded targets.
+  */
+-//#define MBEDTLS_NO_UDBL_DIVISION
++#define MBEDTLS_NO_UDBL_DIVISION
+ 
+ /**
+  * \def MBEDTLS_NO_64BIT_MULTIPLICATION
+@@ -142,7 +142,7 @@
+  *
+  * Comment if your system does not support time functions
+  */
+-#define MBEDTLS_HAVE_TIME
++// #define MBEDTLS_HAVE_TIME
+ 
+ /**
+  * \def MBEDTLS_HAVE_TIME_DATE
+@@ -163,7 +163,7 @@
+  * mbedtls_platform_gmtime_r() at compile-time by using the macro
+  * MBEDTLS_PLATFORM_GMTIME_R_ALT.
+  */
+-#define MBEDTLS_HAVE_TIME_DATE
++// #define MBEDTLS_HAVE_TIME_DATE
+ 
+ /**
+  * \def MBEDTLS_PLATFORM_MEMORY
+@@ -1170,7 +1170,7 @@
+  *
+  * Uncomment this macro to disable the built-in platform entropy functions.
+  */
+-//#define MBEDTLS_NO_PLATFORM_ENTROPY
++#define MBEDTLS_NO_PLATFORM_ENTROPY
+ 
+ /**
+  * \def MBEDTLS_ENTROPY_FORCE_SHA256
+@@ -1288,7 +1288,7 @@
+  *
+  * Enable the checkup functions (*_self_test).
+  */
+-#define MBEDTLS_SELF_TEST
++// #define MBEDTLS_SELF_TEST
+ 
+ /**
+  * \def MBEDTLS_SHA256_SMALLER
+@@ -1812,7 +1812,7 @@
+  *
+  * This modules adds support for the AES-NI instructions on x86-64
+  */
+-#define MBEDTLS_AESNI_C
++// #define MBEDTLS_AESNI_C
+ 
+ /**
+  * \def MBEDTLS_AES_C
+@@ -2370,7 +2370,7 @@
+  *
+  * Uncomment to enable the HAVEGE random generator.
+  */
+-//#define MBEDTLS_HAVEGE_C
++// #define MBEDTLS_HAVEGE_C
+ 
+ /**
+  * \def MBEDTLS_HKDF_C
+@@ -2552,7 +2552,7 @@
+  *
+  * This modules adds support for the VIA PadLock on x86.
+  */
+-#define MBEDTLS_PADLOCK_C
++// #define MBEDTLS_PADLOCK_C
+ 
+ /**
+  * \def MBEDTLS_PEM_PARSE_C
+@@ -2912,7 +2912,7 @@
+  *
+  * This module is used by the HAVEGE random number generator.
+  */
+-#define MBEDTLS_TIMING_C
++// #define MBEDTLS_TIMING_C
+ 
+ /**
+  * \def MBEDTLS_VERSION_C
+-- 
+2.42.0
+

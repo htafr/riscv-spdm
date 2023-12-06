@@ -1,0 +1,20 @@
+[submodule "Buildroot"]
+  path = Buildroot
+  url = https://github.com/buildroot/buildroot.git
+
+[submodule "qemu"]
+  path = qemu
+  url = https://github.com/qemu/qemu.git
+
+[submodule "u-boot"]
+  path = u-boot
+  url = https://github.com/u-boot/u-boot.git
+
+[submodule "libspdm"]
+  path = libspdm
+  url = https://github.com/DMTF/libspdm.git
+
+[submodule "opensbi"]
+  path = opensbi
+  url = https://github.com/riscv-software-src/opensbi.git
+
