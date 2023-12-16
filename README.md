@@ -17,19 +17,19 @@ A specific version of each submodule used was modified, so it's necessary to che
 ```bash
 # Buildroot
 $ cd buildroot
-$ git --checkout 2023.08
+$ git checkout 2023.08
 
 # U-Boot
 $ cd u-boot
-$ git --checkout v2023.07
+$ git checkout v2023.07
 
 # QEMU
 $ cd qemu
-$ git --checkout v6.2.0
+$ git checkout v6.2.0
 
 # LibSPDM
 $ cd libspdm
-$ git --checkout dc48779a5b8c9199b01549311922e05429af2a0e
+$ git checkout dc48779a5b8c9199b01549311922e05429af2a0e
 ```
 
 Now, apply the patches inside the respective folders.
@@ -48,61 +48,45 @@ $ cd libspdm
 $ git am -3 --keep-cr --ignore-space-change patches/libspdm/*.patch
 ```
 
+## Configure the environment
+
+To use the Makefile, some environment variables are needed, so run the `env.sh` script.
+
+```bash
+$ . ./env.sh
+```
+
 ## LibSPDM
 
-LibSPDM needs to be compiled twice: one to use inside U-Boot and another to use inside QEMU.
+LibSPDM needs to be compiled twice: one to use inside U-Boot and another to use inside QEMU. The Makefile already does these actions, just run one command.
 
 ```bash
-# Build for the host
-$ cd libspdm
-$ mkdir build_host
-$ cmake -DARCH=x64 -DTOOLCHAIN=GCC -DTARGET=Release -DCRYPTO=mbedtls -DGCOV=ON ..
-$ make copy_sample_key
-$ make
+$ make libspdm
 ```
 
-```bash
-# Build for U-Boot
-$ mkdir build_uboot
-$ cd build_uboot
-$ cmake -DARCH=riscv64 -DTOOLCHAIN=BROOT_RISCV -DTARGET=Release -DCRYPTO=mbedtls ..
-$ make
-```
+Be aware that, if the architecture you are running is different from x86_64, you may need to change the `-DTOOLCHAIN=GCC` inside Makefile. For instance, I run my experiments also in M1 processor, so the toolchain for me would be `-DTOOLCHAIN=AARCH64_GCC`.
 
 ## QEMU
 
-Go to `qemu` folder, configure and compile it.
+Just execute the make command and it will configure and build QEMU.
 
 ```bash
-$ mkdir build
-$ cd build
-$ ../configure \
-    --target-list=riscv64-softmmu \
-    --enable-gtk \
-    --enable-system \
-    --enable-virtfs \
-    --enable-sdl \
-    --enable-nettle \
-    --disable-pie \
-    --enable-debug \
-    --disable-werror \
-    --enable-jemalloc \
-    --enable-slirp \
-    --enable-libspdm \
-    --libspdm-srcdir=/path/to/libspdm \
-    --libspdm-builddir=/path/to/libspdm/build_host \
-    --libspdm-crypto=mbedtls \
-    --extra-cflags='-fPIC --coverage -fprofile-arcs -ftest-coverage' \
-    --extra-ldflags='-lgcov'
-$ make
+$ make qemu
 ```
 ## Buildroot, U-Boot, OpenSBI
 
-This repository has a Makefile for it, just run the command to make it all.
+This repository has a Makefile for it, just run the command to make it all. There is a configuration file inside `files/u-boot` for U-Boot, it's exactly the configuration I use, just copy it to U-Boot root directory and remember to make it hidden.
 
 ```bash
+# Copying config file to U-Boot
+$ cp files/u-boot/config u-boot/.config
+
 # At workspace
-$ make all
+$ make buildroot
+
+# Since U-Boot and OpenSBI are connected in this project, run the following
+# command to compile both
+$ make payload
 ```
 
 # Running
@@ -139,16 +123,8 @@ $ sudo losetup -d /dev/loopM
 $ sudo rm -rf /mnt/*
 ```
 
-The command to run the emulation is the following.
+Now, just run the shell script to run the project.
 
 ```bash
-$ cd qemu/build
-$ ./riscv64-softmmu/qemu-system-riscv64 \
-    -smp 2 \
-    -nographic \
-    -m 8G \
-    -M virt \
-    -bios /path/to/opensbi/build/platform/generic/firmware/fw_payload.elf \
-    -drive file=/path/to/disk.img,format=raw,id=hd0 \
-    -device virtio-blk-device,drive=hd0
+$ ./run.sh
 ```
