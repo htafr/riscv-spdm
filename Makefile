@@ -56,7 +56,7 @@ payload:
 	$(MAKE) uboot
 	$(MAKE) opensbi
 
-all: clean buildroot uboot opensbi
+all: buildroot libspdm qemu payload
 
 buildroot-clean:
 	$(MAKE) -C buildroot/ distclean
