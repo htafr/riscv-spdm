@@ -9,7 +9,7 @@ This repository is an implementation of LibSPDM inside QEMU and Das U-Boot espec
 Firstly, initialize the submodules.
 
 ```bash
-$ git submodules update --init --recursive
+$ git submodule update --init --recursive
 ```
 
 A specific version of each submodule used was modified, so it's necessary to checkout to different tags and commits.
