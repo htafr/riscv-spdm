@@ -37,15 +37,15 @@ Now, apply the patches inside the respective folders.
 ```bash
 # U-Boot
 $ cd u-boot
-$ git am -3 --keep-cr --ignore-space-change patches/u-boot/*.patch
+$ git am -3 --keep-cr --ignore-space-change ../patches/u-boot/*.patch
 
 # QEMU
 $ cd qemu
-$ git am -3 --keep-cr --ignore-space-change patches/qemu/*.patch
+$ git am -3 --keep-cr --ignore-space-change ../patches/qemu/*.patch
 
 # LibSPDM
 $ cd libspdm
-$ git am -3 --keep-cr --ignore-space-change patches/libspdm/*.patch
+$ git am -3 --keep-cr --ignore-space-change ../patches/libspdm/*.patch
 ```
 
 ## Configure the environment
@@ -61,7 +61,7 @@ $ . ./env.sh
 LibSPDM needs to be compiled twice: one to use inside U-Boot and another to use inside QEMU. The Makefile already does these actions, just run one command.
 
 ```bash
-$ make libspdm
+$ make spdm
 ```
 
 Be aware that, if the architecture you are running is different from x86_64, you may need to change the `-DTOOLCHAIN=GCC` inside Makefile. For instance, I run my experiments also in M1 processor, so the toolchain for me would be `-DTOOLCHAIN=AARCH64_GCC`.
@@ -71,7 +71,7 @@ Be aware that, if the architecture you are running is different from x86_64, you
 Just execute the make command and it will configure and build QEMU.
 
 ```bash
-$ make qemu
+$ make emulator
 ```
 ## Buildroot, U-Boot, OpenSBI
 
@@ -82,7 +82,7 @@ This repository has a Makefile for it, just run the command to make it all. Ther
 $ cp files/u-boot/config u-boot/.config
 
 # At workspace
-$ make buildroot
+$ make broot
 
 # Since U-Boot and OpenSBI are connected in this project, run the following
 # command to compile both
@@ -126,5 +126,5 @@ $ sudo rm -rf /mnt/*
 Now, just run the shell script to run the project.
 
 ```bash
-$ ./run.sh
+$ ./run.sh -hd
 ```
