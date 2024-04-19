@@ -86,12 +86,12 @@ index 912c7e7847..1a8f6b83e0 100644
  endif
  
 +if have_libspdm
-+  spdm_libs = ['cryptlib_mbedtls', 'debuglib', 'malloclib', 'memlib', 'platform_lib_null', 'rnglib',
++  spdm_libs = ['debuglib', 'malloclib', 'memlib', 'platform_lib_null', 'rnglib',
 +               'spdm_common_lib', 'spdm_crypt_ext_lib', 'spdm_crypt_lib', 'spdm_device_secret_lib_sample',
 +               'spdm_responder_lib', 'spdm_secured_message_lib', 'spdm_transport_mctp_lib', 'spdm_transport_pcidoe_lib']
 +
 +  if get_option('libspdm-crypto') == 'mbedtls'
-+    spdm_libs += ['mbedcrypto', 'mbedtls', 'mbedx509']
++    spdm_libs += ['cryptlib_mbedtls', 'mbedcrypto', 'mbedtls', 'mbedx509']
 +  endif
 +
 +  found_spdm_libs = []
