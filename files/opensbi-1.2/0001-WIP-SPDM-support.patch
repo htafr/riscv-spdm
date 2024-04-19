@@ -1,0 +1,72 @@
+From 561d6ec1f71dd3437850549c975527da33121265 Mon Sep 17 00:00:00 2001
+From: offreitas <offreitas@usp.br>
+Date: Fri, 19 Apr 2024 18:00:47 -0300
+Subject: [PATCH] WIP: SPDM support
+
+---
+ Makefile | 29 +++++++++++++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 92203c5..c0d8c2f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -343,6 +343,19 @@ CFLAGS		+=	$(GENFLAGS)
+ CFLAGS		+=	$(platform-cflags-y)
+ CFLAGS		+=	-fno-pie -no-pie
+ CFLAGS		+=	$(firmware-cflags-y)
++ifeq ($(ENABLE_SPDM),y)
++SPDM_CFLAGS		=	-DSPDM_ENABLED -I$(LIBSPDM_SRCDIR)/include -I$(LIBSPDM_SRCDIR)/os_stub
++SPDM_LDFLAGS		=	-Wl,--start-group
++SPDM_LDFLAGS		+=	$(LIBSPDM_BUILDDIR)/lib/libdebuglib.a $(LIBSPDM_BUILDDIR)/lib/libmalloclib.a $(LIBSPDM_BUILDDIR)/lib/libmemlib.a
++SPDM_LDFLAGS		+=	$(LIBSPDM_BUILDDIR)/lib/libplatform_lib_null.a $(LIBSPDM_BUILDDIR)/lib/librnglib.a $(LIBSPDM_BUILDDIR)/lib/libspdm_common_lib.a 
++SPDM_LDFLAGS		+=	$(LIBSPDM_BUILDDIR)/lib/libspdm_crypt_ext_lib.a $(LIBSPDM_BUILDDIR)/lib/libspdm_crypt_lib.a $(LIBSPDM_BUILDDIR)/lib/libspdm_device_secret_lib_sample.a 
++SPDM_LDFLAGS		+=	$(LIBSPDM_BUILDDIR)/lib/libspdm_requester_lib.a $(LIBSPDM_BUILDDIR)/lib/libspdm_secured_message_lib.a $(LIBSPDM_BUILDDIR)/lib/libspdm_transport_mctp_lib.a 
++SPDM_LDFLAGS		+=	$(LIBSPDM_BUILDDIR)/lib/libspdm_transport_pcidoe_lib.a 
++ifeq ($(LIBSPDM_CRYPTO),mbedtls)
++SPDM_LDFLAGS		+=	$(LIBSPDM_BUILDDIR)/lib/libcryptlib_mbedtls.a $(LIBSPDM_BUILDDIR)/lib/libmbedcrypto.a $(LIBSPDM_BUILDDIR)/lib/libmbedtls.a $(LIBSPDM_BUILDDIR)/lib/libmbedx509.a
++endif
++SPDM_LDFLAGS		+=	-Wl,--end-group
++endif
+ 
+ CPPFLAGS	+=	$(GENFLAGS)
+ CPPFLAGS	+=	$(platform-cppflags-y)
+@@ -419,11 +432,17 @@ compile_cpp = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+ compile_cc_dep = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+ 	     echo " CC-DEP    $(subst $(build_dir)/,,$(1))"; \
+ 	     printf %s `dirname $(1)`/  > $(1) && \
+-	     $(CC) $(CFLAGS) $(call dynamic_flags,$(1),$(2))   \
++	     $(CC) $(CFLAGS) $(SPDM_CFLAGS) $(call dynamic_flags,$(1),$(2))   \
+ 	       -MM $(2) >> $(1) || rm -f $(1)
++ifeq ($(ENABLE_SPDM),y)
+ compile_cc = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+ 	     echo " CC        $(subst $(build_dir)/,,$(1))"; \
+-	     $(CC) $(CFLAGS) $(call dynamic_flags,$(1),$(2)) -c $(2) -o $(1)
++			 $(CC) $(CFLAGS) $(SPDM_CFLAGS) $(call dynamic_flags,$(1),$(2)) -c $(2) -o $(1)
++else
++compile_cc = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
++			 echo " CC        $(subst $(build_dir)/,,$(1))"; \
++			 $(CC) $(CFLAGS) $(call dynamic_flags,$(1),$(2)) -c $(2) -o $(1)
++endif
+ compile_as_dep = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+ 	     echo " AS-DEP    $(subst $(build_dir)/,,$(1))"; \
+ 	     printf %s `dirname $(1)`/ > $(1) && \
+@@ -432,9 +451,15 @@ compile_as_dep = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+ compile_as = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+ 	     echo " AS        $(subst $(build_dir)/,,$(1))"; \
+ 	     $(AS) $(ASFLAGS) $(call dynamic_flags,$(1),$(2)) -c $(2) -o $(1)
++ifeq ($(ENABLE_SPDM),y)
++compile_elf = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
++	     echo " ELF       $(subst $(build_dir)/,,$(1))"; \
++	     $(CC) $(CFLAGS) $(3) $(ELFFLAGS) $(SPDM_LDFLAGS) -Wl,-T$(2) -o $(1)
++else
+ compile_elf = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+ 	     echo " ELF       $(subst $(build_dir)/,,$(1))"; \
+ 	     $(CC) $(CFLAGS) $(3) $(ELFFLAGS) -Wl,-T$(2) -o $(1)
++endif
+ compile_ar = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+ 	     echo " AR        $(subst $(build_dir)/,,$(1))"; \
+ 	     $(AR) $(ARFLAGS) $(1) $(2)
+-- 
+2.44.0
+

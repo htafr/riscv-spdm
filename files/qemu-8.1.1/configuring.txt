@@ -1,0 +1,1 @@
+../configure --target-list=riscv64-softmmu --enable-gtk --enable-system --enable-virtfs --enable-sdl --enable-nettle --disable-pie --enable-debug --disable-werror --enable-malloc=jemalloc --enable-slirp --enable-spdm --libspdm-srcdir= --libspdm-builddir=/build_host --extra-cflags='-fPIC --coverage -fprofile-arcs -ftest-coverage' --extra-ldflags='-lgcov'

@@ -1,0 +1,199 @@
+From af6d5eef48e0d572eb5cf38623e90015c7c0349f Mon Sep 17 00:00:00 2001
+From: offreitas <offreitas@usp.br>
+Date: Thu, 18 Apr 2024 16:35:24 -0300
+Subject: [PATCH] SPDM support
+
+---
+ Kconfig.host                  |  3 +++
+ meson.build                   | 48 +++++++++++++++++++++++++++++++++--
+ meson_options.txt             | 12 +++++++++
+ scripts/meson-buildoptions.sh | 10 ++++++++
+ 4 files changed, 71 insertions(+), 2 deletions(-)
+
+diff --git a/Kconfig.host b/Kconfig.host
+index d763d89269..da55341d8f 100644
+--- a/Kconfig.host
++++ b/Kconfig.host
+@@ -35,6 +35,9 @@ config VIRTFS
+ config PVRDMA
+     bool
+ 
++config LIBSPDM
++    bool
++
+ config MULTIPROCESS_ALLOWED
+     bool
+     imply MULTIPROCESS
+diff --git a/meson.build b/meson.build
+index 912c7e7847..1a8f6b83e0 100644
+--- a/meson.build
++++ b/meson.build
+@@ -434,6 +434,26 @@ if get_option('fuzzing')
+   endif
+ endif
+ 
++# spdm 
++spdm_libs = []
++spdm_cflags = []
++have_libspdm = get_option('spdm').enabled()
++if have_libspdm
++  if get_option('libspdm-srcdir') == ''
++    error('No source directory path to parameter libspdm-srcdir')
++  endif
++  if get_option('libspdm-builddir') == ''
++    error('No build directory path to parameter libspdm-builddir')
++  endif
++  if get_option('libspdm-crypto') != 'mbedtls' and \
++      get_option('libspdm-crypto') != 'openssl'
++    error('No cryptographic algorithm to SPDM, choose mbedtls or openssl. Default is mbedtls')
++  endif
++  
++  spdm_cflags = ['-I@0@/include'.format(get_option('libspdm-srcdir'))]
++  add_global_arguments(spdm_cflags, native: false, language: all_languages)
++endif
++
+ add_global_arguments(qemu_common_flags, native: false, language: all_languages)
+ add_global_link_arguments(qemu_ldflags, native: false, language: all_languages)
+ 
+@@ -1817,7 +1837,7 @@ has_statx_mnt_id = cc.has_header_symbol('sys/stat.h', 'STATX_MNT_ID', prefix: gn
+ 
+ have_vhost_user_blk_server = get_option('vhost_user_blk_server') \
+   .require(targetos == 'linux',
+-           error_message: 'vhost_user_blk_server requires linux') \
++           error_message: 'vhost_user_blk_server require.auto()s linux') \
+   .require(have_vhost_user,
+            error_message: 'vhost_user_blk_server requires vhost-user support') \
+   .disable_auto_if(not have_tools and not have_system) \
+@@ -2176,6 +2196,7 @@ config_host_data.set('CONFIG_CFI', get_option('cfi'))
+ config_host_data.set('CONFIG_SELINUX', selinux.found())
+ config_host_data.set('CONFIG_XEN_BACKEND', xen.found())
+ config_host_data.set('CONFIG_LIBDW', libdw.found())
++config_host_data.set('CONFIG_SPDM', have_libspdm)
+ if xen.found()
+   # protect from xen.version() having less than three components
+   xen_version = xen.version().split('.') + ['0', '0']
+@@ -2830,6 +2851,7 @@ disassemblers = {
+ }
+ 
+ have_ivshmem = config_host_data.get('CONFIG_EVENTFD')
++have_libspdm = config_host.has_key('CONFIG_LIBSPDM')
+ host_kconfig = \
+   (get_option('fuzzing') ? ['CONFIG_FUZZ=y'] : []) + \
+   (have_tpm ? ['CONFIG_TPM=y'] : []) + \
+@@ -2844,7 +2866,8 @@ host_kconfig = \
+   ('CONFIG_LINUX' in config_host ? ['CONFIG_LINUX=y'] : []) + \
+   (have_pvrdma ? ['CONFIG_PVRDMA=y'] : []) + \
+   (multiprocess_allowed ? ['CONFIG_MULTIPROCESS_ALLOWED=y'] : []) + \
+-  (vfio_user_server_allowed ? ['CONFIG_VFIO_USER_SERVER_ALLOWED=y'] : [])
++  (vfio_user_server_allowed ? ['CONFIG_VFIO_USER_SERVER_ALLOWED=y'] : []) + \
++  (have_libspdm ? ['CONFIG_LIBSPDM=y'] : [])
+ 
+ ignored = [ 'TARGET_XML_FILES', 'TARGET_ABI_DIR', 'TARGET_ARCH' ]
+ 
+@@ -3975,6 +3998,25 @@ if host_machine.system() == 'windows'
+   alias_target('installer', nsis)
+ endif
+ 
++if have_libspdm
++  spdm_libs = ['cryptlib_mbedtls', 'debuglib', 'malloclib', 'memlib', 'platform_lib_null', 'rnglib',
++               'spdm_common_lib', 'spdm_crypt_ext_lib', 'spdm_crypt_lib', 'spdm_device_secret_lib_sample',
++               'spdm_responder_lib', 'spdm_secured_message_lib', 'spdm_transport_mctp_lib', 'spdm_transport_pcidoe_lib']
++
++  if get_option('libspdm-crypto') == 'mbedtls'
++    spdm_libs += ['mbedcrypto', 'mbedtls', 'mbedx509']
++  endif
++
++  found_spdm_libs = []
++  foreach lib : spdm_libs 
++    found_spdm_libs += cc.find_library(lib, dirs : get_option('libspdm-builddir'))
++  endforeach
++  spdm_dep = declare_dependency(dependencies: found_spdm_libs)
++  
++  common_all.add(spdm_dep)
++endif
++
++
+ #########################
+ # Configuration summary #
+ #########################
+@@ -4117,6 +4159,7 @@ endif
+ summary_info += {'strip binaries':    get_option('strip')}
+ summary_info += {'sparse':            sparse}
+ summary_info += {'mingw32 support':   targetos == 'windows'}
++summary_info += {'LibSPDM CFLAGS':    spdm_cflags}
+ summary(summary_info, bool_yn: true, section: 'Compilation')
+ 
+ # snarf the cross-compilation information for tests
+@@ -4211,6 +4254,7 @@ endif
+ summary_info += {'AF_ALG support':    have_afalg}
+ summary_info += {'rng-none':          get_option('rng_none')}
+ summary_info += {'Linux keyring':     have_keyring}
++summary_info += {'LibSPDM crypto':    get_option('libspdm-crypto')}
+ summary(summary_info, bool_yn: true, section: 'Crypto')
+ 
+ # UI
+diff --git a/meson_options.txt b/meson_options.txt
+index aaea5ddd77..735f58a683 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -350,3 +350,15 @@ option('slirp_smbd', type : 'feature', value : 'auto',
+ 
+ option('hexagon_idef_parser', type : 'boolean', value : true,
+        description: 'use idef-parser to automatically generate TCG code for the Hexagon frontend')
++
++# SPDM
++option('spdm', type : 'feature', value : 'auto',
++       description: 'enable SPDM authentication')
++option('libspdm-srcdir', type : 'string', value : '',
++       description: 'LibSPDM source directory path to use')
++option('libspdm-builddir', type : 'string', value : '',
++       description: 'LibSPDM build directory path to use')
++option('libspdm-crypto', type : 'combo', value : 'mbedtls',
++       choices: ['mbedtls', 'openssl'],
++       description: 'LibSPDM cryptographic algorithm used')
++
+diff --git a/scripts/meson-buildoptions.sh b/scripts/meson-buildoptions.sh
+index 9da3fe299b..e644fc57da 100644
+--- a/scripts/meson-buildoptions.sh
++++ b/scripts/meson-buildoptions.sh
+@@ -58,6 +58,10 @@ meson_options_help() {
+   printf "%s\n" '                           cpu name [/usr/gnemul/qemu-%M]'
+   printf "%s\n" '  --libdir=VALUE           Library directory [system default]'
+   printf "%s\n" '  --libexecdir=VALUE       Library executable directory [libexec]'
++  printf "%s\n" '  --libspdm-builddir=VALUE LibSPDM build directory path to use'
++  printf "%s\n" '  --libspdm-crypto=CHOICE  LibSPDM cryptographic algorithm used [mbedtls]'
++  printf "%s\n" '                           (choices: mbedtls/openssl)'
++  printf "%s\n" '  --libspdm-srcdir=VALUE   LibSPDM source directory path to use'
+   printf "%s\n" '  --localedir=VALUE        Locale data directory [share/locale]'
+   printf "%s\n" '  --localstatedir=VALUE    Localstate data directory [/var/local]'
+   printf "%s\n" '  --mandir=VALUE           Manual page directory [share/man]'
+@@ -164,6 +168,7 @@ meson_options_help() {
+   printf "%s\n" '  snappy          snappy compression support'
+   printf "%s\n" '  sndio           sndio sound support'
+   printf "%s\n" '  sparse          sparse checker'
++  printf "%s\n" '  spdm            enable SPDM authentication'
+   printf "%s\n" '  spice           Spice server support'
+   printf "%s\n" '  spice-protocol  Spice protocol support'
+   printf "%s\n" '  stack-protector compiler-provided stack protection'
+@@ -345,6 +350,9 @@ _meson_option_parse() {
+     --disable-libnfs) printf "%s" -Dlibnfs=disabled ;;
+     --enable-libpmem) printf "%s" -Dlibpmem=enabled ;;
+     --disable-libpmem) printf "%s" -Dlibpmem=disabled ;;
++    --libspdm-builddir=*) quote_sh "-Dlibspdm-builddir=$2" ;;
++    --libspdm-crypto=*) quote_sh "-Dlibspdm-crypto=$2" ;;
++    --libspdm-srcdir=*) quote_sh "-Dlibspdm-srcdir=$2" ;;
+     --enable-libssh) printf "%s" -Dlibssh=enabled ;;
+     --disable-libssh) printf "%s" -Dlibssh=disabled ;;
+     --enable-libudev) printf "%s" -Dlibudev=enabled ;;
+@@ -443,6 +451,8 @@ _meson_option_parse() {
+     --disable-sndio) printf "%s" -Dsndio=disabled ;;
+     --enable-sparse) printf "%s" -Dsparse=enabled ;;
+     --disable-sparse) printf "%s" -Dsparse=disabled ;;
++    --enable-spdm) printf "%s" -Dspdm=enabled ;;
++    --disable-spdm) printf "%s" -Dspdm=disabled ;;
+     --enable-spice) printf "%s" -Dspice=enabled ;;
+     --disable-spice) printf "%s" -Dspice=disabled ;;
+     --enable-spice-protocol) printf "%s" -Dspice_protocol=enabled ;;
+-- 
+2.44.0
+

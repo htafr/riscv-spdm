@@ -1,0 +1,1 @@
+make distclean ; make PLATFORM=generic FW_JUMP_ADDR=0x80000000 FW_JUMP=y ENABLE_SPDM=y LIBSPDM_SRCDIR=/libspdm LIBSPDM_BUILDDIR=/libspdm/build_buildroot LIBSPDM_CRYPTO=mbedtls
